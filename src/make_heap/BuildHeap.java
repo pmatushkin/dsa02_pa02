@@ -29,11 +29,6 @@ public class BuildHeap {
 
     private void generateSwaps() {
         swaps = new ArrayList<Swap>();
-        // The following naive implementation just sorts
-        // the given sequence using selection sort algorithm
-        // and saves the resulting sequence of swaps.
-        // This turns the given array into a heap,
-        // but in the worst case gives a quadratic number of swaps.
 
         // this is the maximal index in data[]
         int max_index = data.length - 1;
@@ -55,7 +50,7 @@ public class BuildHeap {
             }
 
             // right child node index and value
-            int r_child_index = 2 * i + 2;
+            int r_child_index = l_child_index + 1; //2 * i + 2;
             int r_child = Integer.MAX_VALUE;
             if (r_child_index <= max_index) {
                 r_child = data[r_child_index];
@@ -78,56 +73,42 @@ public class BuildHeap {
             // and the minimal child value is less than the value of the parent node
             // then sift the parent node down
             if (min_child != Integer.MAX_VALUE && min_child < data[i]) {
-//                out.println("min_child: " + min_child);
                 SiftDown(i);
             }
-
         }
-
-
-
-//        //
-//        // TODO: replace by a more efficient implementation
-//        for (int i = 0; i < data.length; ++i) {
-//            for (int j = i + 1; j < data.length; ++j) {
-//                if (data[i] > data[j]) {
-//                    swaps.add(new Swap(i, j));
-//                    int tmp = data[i];
-//                    data[i] = data[j];
-//                    data[j] = tmp;
-//                }
-//            }
-//        }
     }
 
     private void SiftDown(int i) {
+//        // print the index of the maximal node
 //        out.println("SiftDown(" + i + ")");
 
+        // this is the index of the current maximal node in need to be sifted down
         int max_index = i;
-        // this is the maximal index in data[]
+        // this is the size of data[]
         int size = data.length - 1;
 
-        // right child node index (first check the the greater of two indexes)
+        // right child node index (first check the greater of two indexes)
         int r_child_index = 2 * i + 2;
         if (r_child_index <= size && data[r_child_index] < data[max_index]) {
             max_index = r_child_index;
         }
 
         // left child node index (then check the lesser of two indexes)
-        int l_child_index = 2 * i + 1;
+        int l_child_index = r_child_index - 1; //2 * i + 1;
         if (l_child_index <= size && data[l_child_index] < data[max_index]) {
             max_index = l_child_index;
         }
 
         if (i != max_index) {
+            // swap the nodes
             swaps.add(new Swap(i, max_index));
             int temp = data[i];
             data[i] = data[max_index];
             data[max_index] = temp;
 
+            // check if the newly sifted down node needs to be further sifted down
             SiftDown(max_index);
         }
-
     }
 
     public void solve() throws IOException {
