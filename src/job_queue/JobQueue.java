@@ -1,5 +1,4 @@
 import java.io.*;
-import java.util.PriorityQueue;
 import java.util.StringTokenizer;
 
 public class JobQueue {
@@ -46,46 +45,55 @@ public class JobQueue {
         assignedWorker = new int[jobs.length];
         startTime = new long[jobs.length];
 
+        if (numWorkers > jobs.length) {
+            numWorkers = jobs.length;
+        }
+
         // a min-heap of worker threads
         Worker[] workerHeap = new Worker[numWorkers];
 
+        // a max index of a head element in a heap
+        int maxHeapHead = numWorkers - 1;
         // an index of a head element in a heap
-        // idea: populate heap from bottom to top,
-        // use an index of a head element in the heap
-        // as a starting point of the process of sifting down,
-        // thus cutting down the processing time
-        // a note on the initial value: don't decrement by 1 here,
-        // because its value will be decremented before addition of a new worker thread
-        int heapHead = numWorkers;
+        int heapHead = maxHeapHead;
 
         // a current time counter to use when creating the new threads
         long currentTime = 0;
 
+        // initialize the head of the heap
+        workerHeap[heapHead] = new Worker(0, currentTime);
+
+        Worker bestThread;
+
         for (int i = 0; i < jobs.length; i++) {
-            // decide whether to use an existing worker thread,
-            // or create a new one.
-            if (heapHead != 0) {
-                // there are available threads still
-                // AND we're past the initialization, so we can check when the top thread becomes available
-                // and the current thread becomes available later than the current time
-                if (!(heapHead < numWorkers && workerHeap[heapHead] != null && workerHeap[heapHead].nextFreeTime == currentTime)) {
-                    // creating a new thread and adding to a heap
+            if (heapHead == 0) {
+                bestThread = workerHeap[0];
+            } else {
+                // create a new worker thread if possible
+                if (workerHeap[heapHead].nextFreeTime > currentTime) {
                     heapHead--;
-                    workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, currentTime);
+                    bestThread = new Worker(maxHeapHead - heapHead, currentTime);
+                    workerHeap[heapHead] = bestThread;
+                } else {
+                    bestThread = workerHeap[heapHead];
                 }
             }
 
-            Worker bestWorker = workerHeap[heapHead];
+            long bestNextFreeTime = bestThread.nextFreeTime;
 
             // write down the output values
-            assignedWorker[i] = bestWorker.id;
-            startTime[i] = bestWorker.nextFreeTime;
+            assignedWorker[i] = bestThread.id;
+            startTime[i] = bestNextFreeTime;
 
             // move the current time
-            currentTime += bestWorker.nextFreeTime;
+            currentTime += bestNextFreeTime;
 
             // compute the next free time
-            bestWorker.nextFreeTime += jobs[i];
+            bestThread.nextFreeTime = bestNextFreeTime + jobs[i];
+
+            if (heapHead == maxHeapHead) {
+                continue;
+            }
 
             // rearrange the elements of min-heap
             SiftDown(workerHeap, heapHead);
@@ -93,27 +101,12 @@ public class JobQueue {
     }
 
     private void SiftDown(Worker[] workerHeap, int heapHead) {
-//        boolean isHeapRearranged = false;
-
         int i = heapHead;
 
         while (true) {
             if (i == numWorkers - 1) {
                 return;
-//                isHeapRearranged = true;
             } else {
-//                Worker workerHeap_i = workerHeap[i];
-//                Worker workerHeap_i_next = workerHeap[i + 1];
-//
-//                int i_id = workerHeap_i.id;
-//                long i_nextFreeTime = workerHeap_i.nextFreeTime;
-//
-//                int i_next_id = workerHeap_i_next.id;
-//                long i_next_nextFreeTime = workerHeap_i_next.nextFreeTime;
-
-//                Worker workerHeap_i = workerHeap[i];
-//                Worker workerHeap_i_next = workerHeap[i + 1];
-
                 int i_id = workerHeap[i].id;
                 long i_nextFreeTime = workerHeap[i].nextFreeTime;
 
@@ -126,21 +119,17 @@ public class JobQueue {
 
                     workerHeap[++i].id = i_id;
                     workerHeap[i].nextFreeTime = i_nextFreeTime;
+                } else if (i_nextFreeTime < i_next_nextFreeTime) {
+                    return;
                 } else {
-                    if (i_nextFreeTime < i_next_nextFreeTime) {
-                        return;
-//                        isHeapRearranged = true;
-                    } else {
-                        if (i_id < i_next_id) {
-                            return;
-//                            isHeapRearranged = true;
-                        } else {
-                            workerHeap[i].id = i_next_id;
-                            workerHeap[i].nextFreeTime = i_next_nextFreeTime;
+                    if (i_id > i_next_id) {
+                        workerHeap[i].id = i_next_id;
+                        workerHeap[i].nextFreeTime = i_next_nextFreeTime;
 
-                            workerHeap[++i].id = i_id;
-                            workerHeap[i].nextFreeTime = i_nextFreeTime;
-                        }
+                        workerHeap[++i].id = i_id;
+                        workerHeap[i].nextFreeTime = i_nextFreeTime;
+                    } else {
+                        return;
                     }
                 }
             }
