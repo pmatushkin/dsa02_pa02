@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.PriorityQueue;
 import java.util.StringTokenizer;
 
 public class JobQueue {
@@ -53,43 +54,24 @@ public class JobQueue {
         // use an index of a head element in the heap
         // as a starting point of the process of sifting down,
         // thus cutting down the processing time
+        // a note on the initial value: don't decrement by 1 here,
+        // because its value will be decremented before addition of a new worker thread
         int heapHead = numWorkers;
 
         // a current time counter to use when creating the new threads
         long currentTime = 0;
 
         for (int i = 0; i < jobs.length; i++) {
-//            Worker bestWorker;// = workerHeap[0];
-
-////            if (heapHead != 0) {
-////                if (null == workerHeap[heapHead] || workerHeap[heapHead].nextFreeTime > 0) {
-////                    workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, currentTime);
-////                }
-////            }
-//
-//            if (null == workerHeap[heapHead]) {
-//                // initialize heap with the first heap element
-//                workerHeap[heapHead] = new Worker(0, 0);
-//            } else {
-//                // decide whether to use a best element from the top of the heap,
-//                // or, if available, create a new one
-//                if (heapHead != 0) {
-//                    workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, 0);
-//                }
-//            }
-
             // decide whether to use an existing worker thread,
             // or create a new one.
             if (heapHead != 0) {
-                if (heapHead < numWorkers && workerHeap[heapHead] != null && workerHeap[heapHead].nextFreeTime == currentTime) {
-                    // using an existing thread
-                    // we just need to increment a current time counter
-                    currentTime += jobs[i];
-                } else {
-                    // creating a new one
+                // there are available threads still
+                // AND we're past the initialization, so we can check when the top thread becomes available
+                // and the current thread becomes available later than the current time
+                if (!(heapHead < numWorkers && workerHeap[heapHead] != null && workerHeap[heapHead].nextFreeTime == currentTime)) {
+                    // creating a new thread and adding to a heap
                     heapHead--;
                     workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, currentTime);
-//                    currentTime += jobs[i];
                 }
             }
 
@@ -99,6 +81,9 @@ public class JobQueue {
             assignedWorker[i] = bestWorker.id;
             startTime[i] = bestWorker.nextFreeTime;
 
+            // move the current time
+            currentTime += bestWorker.nextFreeTime;
+
             // compute the next free time
             bestWorker.nextFreeTime += jobs[i];
 
@@ -107,64 +92,62 @@ public class JobQueue {
         }
     }
 
-    // not finished
-    private void assignJobsAllocateDynamically() {
-        // TODO: replace this code with a faster algorithm.
-        assignedWorker = new int[jobs.length];
-        startTime = new long[jobs.length];
+    private void SiftDown(Worker[] workerHeap, int heapHead) {
+//        boolean isHeapRearranged = false;
 
-        // a min-heap of worker threads
-        Worker[] workerHeap = new Worker[numWorkers];
+        int i = heapHead;
 
-        // a number of still available threads
-        int numAvailableWorkers = numWorkers;
-
-        // a next free time value to use
-        // while there are still workers not in the heap
-        // (when all the workers are added to the heap,
-        // we'll be using Worker.nextFreeTime values)
-        long nextFreeTime = 0;
-
-        for (int i = 0; i < jobs.length; i++) {
-            int heapWorkerId = -1;
-            long heapNextFreeTime = -1;
-
-            int jobDuration = jobs[i];
-
-            if (null == workerHeap[0]) {
-                Worker worker = new Worker(0, jobDuration);
-                workerHeap[0] = worker;
-                numAvailableWorkers--;
-
-                assignedWorker[0] = 0;
-                startTime[0] = 0;
+        while (true) {
+            if (i == numWorkers - 1) {
+                return;
+//                isHeapRearranged = true;
             } else {
-                heapWorkerId = workerHeap[0].id;
-                heapNextFreeTime = workerHeap[0].nextFreeTime;
+//                Worker workerHeap_i = workerHeap[i];
+//                Worker workerHeap_i_next = workerHeap[i + 1];
+//
+//                int i_id = workerHeap_i.id;
+//                long i_nextFreeTime = workerHeap_i.nextFreeTime;
+//
+//                int i_next_id = workerHeap_i_next.id;
+//                long i_next_nextFreeTime = workerHeap_i_next.nextFreeTime;
 
-                Worker nextWorker;
+//                Worker workerHeap_i = workerHeap[i];
+//                Worker workerHeap_i_next = workerHeap[i + 1];
 
-                // check if we can schedule the next thread immediately
-                if (numAvailableWorkers > 0 && nextFreeTime < heapNextFreeTime) {
-                    nextWorker = new Worker(numWorkers - numAvailableWorkers, nextFreeTime + jobDuration);
-                    workerHeap[numWorkers - numAvailableWorkers] = nextWorker;
+                int i_id = workerHeap[i].id;
+                long i_nextFreeTime = workerHeap[i].nextFreeTime;
 
-                    numAvailableWorkers--;
+                int i_next_id = workerHeap[i + 1].id;
+                long i_next_nextFreeTime = workerHeap[i + 1].nextFreeTime;
 
-                    SiftUp(numWorkers - numAvailableWorkers, workerHeap);
+                if (i_nextFreeTime > i_next_nextFreeTime) {
+                    workerHeap[i].id = i_next_id;
+                    workerHeap[i].nextFreeTime = i_next_nextFreeTime;
+
+                    workerHeap[++i].id = i_id;
+                    workerHeap[i].nextFreeTime = i_nextFreeTime;
                 } else {
+                    if (i_nextFreeTime < i_next_nextFreeTime) {
+                        return;
+//                        isHeapRearranged = true;
+                    } else {
+                        if (i_id < i_next_id) {
+                            return;
+//                            isHeapRearranged = true;
+                        } else {
+                            workerHeap[i].id = i_next_id;
+                            workerHeap[i].nextFreeTime = i_next_nextFreeTime;
 
+                            workerHeap[++i].id = i_id;
+                            workerHeap[i].nextFreeTime = i_nextFreeTime;
+                        }
+                    }
                 }
-
-//                SiftDown(workerHeap, heapHead);
             }
         }
     }
 
-    private void SiftUp(int i, Worker[] workerHeap) {
-    }
-
-    private void SiftDown(Worker[] workerHeap, int heapHead) {
+    private void SiftDown_Works(Worker[] workerHeap, int heapHead) {
         boolean isHeapRearranged = false;
 
         int i = heapHead;
@@ -173,22 +156,23 @@ public class JobQueue {
             if (i == numWorkers - 1) {
                 isHeapRearranged = true;
             } else {
-                if (workerHeap[i].nextFreeTime > workerHeap[i + 1].nextFreeTime) {
-                    Worker temp = workerHeap[i];
-                    workerHeap[i] = workerHeap[i + 1];
-                    workerHeap[i + 1] = temp;
+                Worker workerHeap_i = workerHeap[i];
+                Worker workerHeap_i_next = workerHeap[i + 1];
+
+                if (workerHeap_i.nextFreeTime > workerHeap_i_next.nextFreeTime) {
+                    workerHeap[i] = workerHeap_i_next;
+                    workerHeap[i + 1] = workerHeap_i;
 
                     i++;
                 } else {
-                    if (workerHeap[i].nextFreeTime < workerHeap[i + 1].nextFreeTime) {
+                    if (workerHeap_i.nextFreeTime < workerHeap_i_next.nextFreeTime) {
                         isHeapRearranged = true;
                     } else {
-                        if (workerHeap[i].id < workerHeap[i + 1].id) {
+                        if (workerHeap_i.id < workerHeap_i_next.id) {
                             isHeapRearranged = true;
                         } else {
-                            Worker temp = workerHeap[i];
-                            workerHeap[i] = workerHeap[i + 1];
-                            workerHeap[i + 1] = temp;
+                            workerHeap[i] = workerHeap_i_next;
+                            workerHeap[i + 1] = workerHeap_i;
 
                             i++;
                         }
