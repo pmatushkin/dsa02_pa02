@@ -1,4 +1,6 @@
 import java.io.*;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 import java.util.StringTokenizer;
 
 public class JobQueue {
@@ -40,7 +42,88 @@ public class JobQueue {
         public long nextFreeTime;
     }
 
+    class WorkerComparator implements Comparator<Worker> {
+        @Override
+        public int compare(Worker o1, Worker o2) {
+            if (o1.nextFreeTime > o2.nextFreeTime) {
+                return 1;
+            } else if (o1.nextFreeTime < o2.nextFreeTime) {
+                return -1;
+            } else {
+                if (o1.id > o2.id) {
+                    return 1;
+                } else if (o1.id < o2.id) {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            }
+        }
+    }
+
     private void assignJobs() {
+        // TODO: replace this code with a faster algorithm.
+        assignedWorker = new int[jobs.length];
+        startTime = new long[jobs.length];
+
+        // a built-in priority queue implementation
+        // with the comparator providing the min-heap functionality
+        PriorityQueue<Worker> pq = new PriorityQueue<>(numWorkers, new WorkerComparator());
+
+        // a current time counter to use when creating the new threads
+        long currentTime = 0;
+
+        // a best available thread
+        Worker bestThread;
+
+        for (int i = 0; i < jobs.length; i++) {
+            int heapSize = pq.size();
+
+            if (heapSize == numWorkers) {
+                // new worker threads are not available; polling the queue
+                bestThread = pq.poll();
+            } else {
+                // new worker threads are still available;
+                // deciding whether to use one of them
+                bestThread = pq.peek();
+
+                if (bestThread == null) {
+                    // creating a new worker thread because the queue is empty
+                    bestThread = new Worker(heapSize, currentTime);
+                } else if (bestThread.nextFreeTime > currentTime) {
+                    // creating a new worker thread because the existing thread
+                    // at the top of the queue is less optimal
+                    bestThread = new Worker(heapSize, currentTime);
+                } else {
+                    // using an existing worker thread from the top of the queue
+                    bestThread = pq.poll();
+                }
+            }
+
+            // read the next free time of a best available thread
+            long bestNextFreeTime = bestThread.nextFreeTime;
+
+            // write down the output values
+            assignedWorker[i] = bestThread.id;
+            startTime[i] = bestNextFreeTime;
+
+            // move the current time
+            currentTime += bestNextFreeTime;
+
+            // compute the next free time
+            bestThread.nextFreeTime = bestNextFreeTime + jobs[i];
+
+            // place the best available thread back into the queue
+            pq.add(bestThread);
+        }
+    }
+
+    // This is the best array-based implementation
+    // of the min-heap queue I could come up with
+    // in the time I had, and it still returns something like
+    // "Failed case #9/28: time limit exceeded (Time used: 6.63/4.00".
+    // Resorting to the built-in implementation of PriorityQueue<>.
+    private void assignJobs_Array() {
         // TODO: replace this code with a faster algorithm.
         assignedWorker = new int[jobs.length];
         startTime = new long[jobs.length];
@@ -63,22 +146,31 @@ public class JobQueue {
         // initialize the head of the heap
         workerHeap[heapHead] = new Worker(0, currentTime);
 
+        // a best available thread
         Worker bestThread;
 
         for (int i = 0; i < jobs.length; i++) {
             if (heapHead == 0) {
+                // new worker threads are not available;
+                // using the thread at the top of the queue
                 bestThread = workerHeap[0];
             } else {
-                // create a new worker thread if possible
+                // new worker threads are still available;
+                // deciding whether to use one of them
+
                 if (workerHeap[heapHead].nextFreeTime > currentTime) {
+                    // creating a new worker thread because the existing thread
+                    // at the top of the queue is less optimal
                     heapHead--;
                     bestThread = new Worker(maxHeapHead - heapHead, currentTime);
                     workerHeap[heapHead] = bestThread;
                 } else {
+                    // using an existing worker thread from the top of the queue
                     bestThread = workerHeap[heapHead];
                 }
             }
 
+            // read the next free time of a best available thread
             long bestNextFreeTime = bestThread.nextFreeTime;
 
             // write down the output values
@@ -91,11 +183,12 @@ public class JobQueue {
             // compute the next free time
             bestThread.nextFreeTime = bestNextFreeTime + jobs[i];
 
+            // don't do SiftDown() if there is only one worker thread in the queue
             if (heapHead == maxHeapHead) {
                 continue;
             }
 
-            // rearrange the elements of min-heap
+            // rearrange the threads in the min-heap
             SiftDown(workerHeap, heapHead);
         }
     }
@@ -107,6 +200,8 @@ public class JobQueue {
             if (i == numWorkers - 1) {
                 return;
             } else {
+                // what follows is basically a code to compare two worker threads
+                // interspersed with the code to swap two elements of the min-heap
                 int i_id = workerHeap[i].id;
                 long i_nextFreeTime = workerHeap[i].nextFreeTime;
 
@@ -133,59 +228,6 @@ public class JobQueue {
                     }
                 }
             }
-        }
-    }
-
-    private void SiftDown_Works(Worker[] workerHeap, int heapHead) {
-        boolean isHeapRearranged = false;
-
-        int i = heapHead;
-
-        while (!isHeapRearranged) {
-            if (i == numWorkers - 1) {
-                isHeapRearranged = true;
-            } else {
-                Worker workerHeap_i = workerHeap[i];
-                Worker workerHeap_i_next = workerHeap[i + 1];
-
-                if (workerHeap_i.nextFreeTime > workerHeap_i_next.nextFreeTime) {
-                    workerHeap[i] = workerHeap_i_next;
-                    workerHeap[i + 1] = workerHeap_i;
-
-                    i++;
-                } else {
-                    if (workerHeap_i.nextFreeTime < workerHeap_i_next.nextFreeTime) {
-                        isHeapRearranged = true;
-                    } else {
-                        if (workerHeap_i.id < workerHeap_i_next.id) {
-                            isHeapRearranged = true;
-                        } else {
-                            workerHeap[i] = workerHeap_i_next;
-                            workerHeap[i + 1] = workerHeap_i;
-
-                            i++;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void assignJobsNaive() {
-        // TODO: replace this code with a faster algorithm.
-        assignedWorker = new int[jobs.length];
-        startTime = new long[jobs.length];
-        long[] nextFreeTime = new long[numWorkers];
-        for (int i = 0; i < jobs.length; i++) {
-            int duration = jobs[i];
-            int bestWorker = 0;
-            for (int j = 0; j < numWorkers; ++j) {
-                if (nextFreeTime[j] < nextFreeTime[bestWorker])
-                    bestWorker = j;
-            }
-            assignedWorker[i] = bestWorker;
-            startTime[i] = nextFreeTime[bestWorker];
-            nextFreeTime[bestWorker] += duration;
         }
     }
 
