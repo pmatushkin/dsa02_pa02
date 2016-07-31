@@ -45,18 +45,55 @@ public class JobQueue {
         assignedWorker = new int[jobs.length];
         startTime = new long[jobs.length];
 
-        numWorkers = Math.min(numWorkers, jobs.length);
-
         // a min-heap of worker threads
         Worker[] workerHeap = new Worker[numWorkers];
-        for (int i = 0; i < numWorkers; i++) {
-            workerHeap[i] = new Worker(i, 0);
-        }
+
+        // an index of a head element in a heap
+        // idea: populate heap from bottom to top,
+        // use an index of a head element in the heap
+        // as a starting point of the process of sifting down,
+        // thus cutting down the processing time
+        int heapHead = numWorkers;
+
+        // a current time counter to use when creating the new threads
+        long currentTime = 0;
 
         for (int i = 0; i < jobs.length; i++) {
-            // read the best available working thread object
-            // it's always at the top of the min-heap
-            Worker bestWorker = workerHeap[0];
+//            Worker bestWorker;// = workerHeap[0];
+
+////            if (heapHead != 0) {
+////                if (null == workerHeap[heapHead] || workerHeap[heapHead].nextFreeTime > 0) {
+////                    workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, currentTime);
+////                }
+////            }
+//
+//            if (null == workerHeap[heapHead]) {
+//                // initialize heap with the first heap element
+//                workerHeap[heapHead] = new Worker(0, 0);
+//            } else {
+//                // decide whether to use a best element from the top of the heap,
+//                // or, if available, create a new one
+//                if (heapHead != 0) {
+//                    workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, 0);
+//                }
+//            }
+
+            // decide whether to use an existing worker thread,
+            // or create a new one.
+            if (heapHead != 0) {
+                if (heapHead < numWorkers && workerHeap[heapHead] != null && workerHeap[heapHead].nextFreeTime == currentTime) {
+                    // using an existing thread
+                    // we just need to increment a current time counter
+                    currentTime += jobs[i];
+                } else {
+                    // creating a new one
+                    heapHead--;
+                    workerHeap[heapHead] = new Worker(numWorkers - 1 - heapHead, currentTime);
+//                    currentTime += jobs[i];
+                }
+            }
+
+            Worker bestWorker = workerHeap[heapHead];
 
             // write down the output values
             assignedWorker[i] = bestWorker.id;
@@ -66,7 +103,7 @@ public class JobQueue {
             bestWorker.nextFreeTime += jobs[i];
 
             // rearrange the elements of min-heap
-            SiftDown(workerHeap);
+            SiftDown(workerHeap, heapHead);
         }
     }
 
@@ -119,7 +156,7 @@ public class JobQueue {
 
                 }
 
-                SiftDown(workerHeap);
+//                SiftDown(workerHeap, heapHead);
             }
         }
     }
@@ -127,10 +164,10 @@ public class JobQueue {
     private void SiftUp(int i, Worker[] workerHeap) {
     }
 
-    private void SiftDown(Worker[] workerHeap) {
+    private void SiftDown(Worker[] workerHeap, int heapHead) {
         boolean isHeapRearranged = false;
 
-        int i = 0;
+        int i = heapHead;
 
         while (!isHeapRearranged) {
             if (i == numWorkers - 1) {
